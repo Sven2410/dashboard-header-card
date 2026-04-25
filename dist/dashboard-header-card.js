@@ -244,7 +244,6 @@ const CARD_CSS = `
 
   /* ── RECHTER KOLOM: 1 horizontale regel ── */
   .right-col {
-    flex: 1;
     display: flex;
     align-items: center;
     justify-content: flex-start;
