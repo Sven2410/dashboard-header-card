@@ -187,7 +187,8 @@ const CARD_CSS = `
    */
   .card-inner {
     display: flex;
-    align-items: center;   /* rechterkolom verticaal gecentreerd */
+    align-items: center;
+    justify-content: center;
     gap: 0;
     padding: 10px 18px;
   }
