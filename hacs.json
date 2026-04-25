@@ -1,0 +1,10 @@
+{
+  "name": "Dashboard Header Card",
+  "version": "1.0.0",
+  "hacs": "1.6.0",
+  "homeassistant": "2024.1.0",
+  "documentations": "https://github.com/Sven2410/dashboard-header-card/blob/main/README.md",
+  "issues": "https://github.com/Sven2410/dashboard-header-card/issues",
+  "filename": "dist/dashboard-header-card.js",
+  "content_in_root": false
+}
