@@ -1,9 +1,9 @@
 /**
- * dashboard-header-card  v1.2.0
- * Minimale transparante header — Sven2410
+ * dashboard-header-card  v1.3.0
+ * Compacte transparante header — Sven2410
  */
 
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 console.info(
   `%c DASHBOARD-HEADER-CARD %c v${VERSION} `,
   'background:#026FA1;color:#fff;font-weight:bold;border-radius:3px 0 0 3px;padding:2px 6px;',
@@ -12,9 +12,9 @@ console.info(
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
-const DAYS_FULL_NL  = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'];
-const MONTHS_NL     = ['januari','februari','maart','april','mei','juni',
-                        'juli','augustus','september','oktober','november','december'];
+const DAYS_FULL_NL = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'];
+const MONTHS_NL    = ['januari','februari','maart','april','mei','juni',
+                       'juli','augustus','september','oktober','november','december'];
 
 const STATE_LABELS_NL = {
   sunny:'Zonnig','clear-night':'Helder',partlycloudy:'Gedeeltelijk bewolkt',
@@ -44,26 +44,20 @@ function windDir(deg) {
   return ' ' + WIND_DIRS[Math.round(deg / 45) % 8];
 }
 
-// Volgende zonevent: geeft { icon, time } terug op basis van next_rising vs next_setting
+// Volgende zonevent: vergelijkt next_rising vs next_setting en pakt de eerstvolgende
 function nextSunEvent(attr) {
   const r = attr.next_rising  ? new Date(attr.next_rising).getTime()  : null;
   const s = attr.next_setting ? new Date(attr.next_setting).getTime() : null;
   if (!r && !s) return { icon:'🌅', time:'--:--' };
-  if (!s || (r && r < s)) return { icon:'🌅', time: fmtHM(attr.next_rising)  }; // zonsopkomst eerst
-  return                         { icon:'🌇', time: fmtHM(attr.next_setting) }; // zonsondergang eerst
+  if (!s || (r && r < s)) return { icon:'🌅', time: fmtHM(attr.next_rising)  };
+  return                         { icon:'🌇', time: fmtHM(attr.next_setting) };
 }
 
 // ─── WEATHER SVG ANIMATIONS ──────────────────────────────────────────────────
-// Kleuren via CSS-variabelen zodat ze meegaan met elk thema
 
 const SVG = {
   sunny:`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .sc{animation:sp 3s ease-in-out infinite;transform-origin:30px 30px}
-      .sr{animation:rr 12s linear infinite;transform-origin:30px 30px}
-      @keyframes sp{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
-      @keyframes rr{to{transform:rotate(360deg)}}
-    </style>
+    <style>.sc{animation:sp 3s ease-in-out infinite;transform-origin:30px 30px}.sr{animation:rr 12s linear infinite;transform-origin:30px 30px}@keyframes sp{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}@keyframes rr{to{transform:rotate(360deg)}}</style>
     <g class="sr">${[0,45,90,135,180,225,270,315].map(a=>{const r=a*Math.PI/180,x1=(30+16*Math.sin(r)).toFixed(1),y1=(30-16*Math.cos(r)).toFixed(1),x2=(30+23*Math.sin(r)).toFixed(1),y2=(30-23*Math.cos(r)).toFixed(1);return`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--primary-text-color)" stroke-width="2.5" stroke-linecap="round" opacity=".65"/>`;}).join('')}</g>
     <circle class="sc" cx="30" cy="30" r="11" fill="var(--primary-text-color)" opacity=".8"/>
   </svg>`,
@@ -175,12 +169,8 @@ function getWeatherSVG(state) {
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 
 const CARD_CSS = `
-  :host {
-    display: block;
-    width: 100%;
-  }
+  :host { display: block; width: 100%; }
 
-  /* Neutraliseer ha-card volledig — geen achtergrond, geen shadow, geen border */
   ha-card {
     background: transparent !important;
     box-shadow: none !important;
@@ -190,56 +180,65 @@ const CARD_CSS = `
     -webkit-backdrop-filter: none !important;
   }
 
-  .wrap {
-    padding: 10px 18px 10px;
-  }
-
-  /* ── ROW 1: begroeting + datum | klok ── */
-  .row1 {
+  /* ─ HOOFD LAYOUT: links (tekst) | rechts (weer + stats) ─ */
+  .card-inner {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
+    gap: 0;
+    padding: 10px 18px 10px;
+    min-height: 0;
   }
 
+  /* ── LINKS: welkom + datum + klok gestapeld ── */
+  .left-col {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    flex-shrink: 0;
+    /* breedte die past bij de langste regel */
+    min-width: 0;
+  }
+
+  /* Welkomstbericht — zelfde gewicht als klok */
   .greeting {
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--primary-text-color);
-    line-height: 1.2;
+    line-height: 1.25;
     white-space: nowrap;
   }
+
   .date-str {
     font-size: 0.68rem;
     color: var(--secondary-text-color);
-    margin-top: 2px;
     white-space: nowrap;
+    line-height: 1.3;
   }
 
-  /* Dik condensed lettertype voor de klok */
+  /* Klok: zelfde vet als welkomstbericht, maar iets groter */
   .clock {
-    font-family: 'Arial Black', 'Impact', 'Haettenschweiler', sans-serif;
-    font-size: 2.4rem;
-    font-weight: 900;
+    font-size: 1.7rem;
+    font-weight: 700;
     color: var(--primary-text-color);
     font-variant-numeric: tabular-nums;
-    letter-spacing: 1px;
-    line-height: 1;
-    text-align: right;
-    flex-shrink: 0;
+    letter-spacing: -0.5px;
+    line-height: 1.15;
+    margin-top: 3px;
   }
 
-  /* ── ROW 2: weer + stats ── */
-  .row2 {
+  /* ── RECHTS: weer + stats gecentreerd ── */
+  .right-col {
+    flex: 1;
     display: flex;
     align-items: center;
+    justify-content: flex-end;   /* naar rechts uitgelijnd */
     gap: 10px;
-    min-height: 44px;
-    flex-wrap: wrap;
+    min-width: 0;
+    padding-left: 18px;          /* iets meer ruimte t.o.v. de linkerkant */
   }
 
-  /* Klikbaar weersblok */
+  /* Klikbaar weersblok (icon + temp + omschrijving) */
   .weather-block {
     display: flex;
     align-items: center;
@@ -257,8 +256,8 @@ const CARD_CSS = `
 
   .weather-icon-wrap {
     position: relative;
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
     flex-shrink: 0;
   }
 
@@ -266,7 +265,7 @@ const CARD_CSS = `
     display: none;
     position: absolute;
     top: 0; right: 0;
-    width: 10px; height: 10px;
+    width: 9px; height: 9px;
     background: var(--error-color, #e53935);
     border-radius: 50%;
     animation: warn-pulse 1s ease-in-out infinite;
@@ -277,55 +276,63 @@ const CARD_CSS = `
     50%{transform:scale(1.5);opacity:.3}
   }
 
+  .temp-wrap {}
+
   .temperature {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     font-weight: 800;
     color: var(--primary-text-color);
     line-height: 1;
   }
   .wdesc {
-    font-size: 0.65rem;
+    font-size: 0.63rem;
     color: var(--secondary-text-color);
     margin-top: 2px;
     white-space: nowrap;
   }
 
-  /* Verticale scheidingslijn tussen weer en stats */
+  /* Verticale scheidingslijn */
   .vdiv {
     width: 1px;
-    height: 28px;
+    height: 26px;
     background: var(--divider-color, rgba(128,128,128,0.25));
     flex-shrink: 0;
   }
 
-  /* Stats inline */
+  /* Stats: 2-koloms grid, iconen iets groter */
   .stats {
-    flex: 1;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px 14px;
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 4px 18px;
     align-items: center;
-    min-width: 0;
   }
+
   .stat {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
     font-size: 0.70rem;
     color: var(--secondary-text-color);
     white-space: nowrap;
   }
+
+  /* Icoon iets groter dan de tekst */
+  .si {
+    font-size: 1.05rem;
+    line-height: 1;
+  }
+
   .sv {
     font-weight: 700;
     color: var(--primary-text-color);
-    margin: 0 1px;
   }
 
-  @media (max-width: 380px) {
-    .wrap     { padding: 8px 12px 8px; }
-    .clock    { font-size: 1.9rem; }
-    .greeting { font-size: 0.85rem; }
-    .stats    { gap: 3px 10px; }
+  @media (max-width: 420px) {
+    .card-inner  { padding: 8px 12px; }
+    .clock       { font-size: 1.4rem; }
+    .greeting    { font-size: 0.85rem; }
+    .stats       { gap: 3px 12px; }
+    .right-col   { padding-left: 10px; }
   }
 `;
 
@@ -413,7 +420,6 @@ class DashboardHeaderCard extends HTMLElement {
 
   _startTick() {
     if (this._tickInterval) return;
-    // Elke minuut updaten — geen seconden
     this._tickInterval = setInterval(() => this._updateDOM(), 60000);
   }
   _stopTick() {
@@ -442,25 +448,25 @@ class DashboardHeaderCard extends HTMLElement {
     sr.innerHTML = `
       <style>${CARD_CSS}</style>
       <ha-card>
-        <div class="wrap">
+        <div class="card-inner">
 
-          <!-- ROW 1: begroeting + datum | klok -->
-          <div class="row1">
-            <div>
-              <div class="greeting" id="greeting">Goedemorgen!</div>
-              <div class="date-str" id="date-str">...</div>
-            </div>
-            <div class="clock" id="clock">00:00</div>
+          <!-- LINKS: welkomstbericht · datum · klok -->
+          <div class="left-col">
+            <div class="greeting" id="greeting">Goedemorgen!</div>
+            <div class="date-str" id="date-str">...</div>
+            <div class="clock"    id="clock">00:00</div>
           </div>
 
-          <!-- ROW 2: weer | stats -->
-          <div class="row2">
+          <!-- RECHTS: weer + stats gecentreerd verticaal -->
+          <div class="right-col">
+
+            <!-- Weersblok: icon + temp + omschrijving -->
             <div class="weather-block" id="weather-block">
               <div class="weather-icon-wrap">
                 <div id="wsvg" style="width:100%;height:100%"></div>
                 <div class="warn-badge" id="warn"></div>
               </div>
-              <div>
+              <div class="temp-wrap">
                 <div class="temperature" id="temp">--°</div>
                 <div class="wdesc"        id="wdesc">--</div>
               </div>
@@ -468,20 +474,23 @@ class DashboardHeaderCard extends HTMLElement {
 
             <div class="vdiv"></div>
 
+            <!-- 2-koloms stats grid -->
             <div class="stats">
-              <div class="stat">💧 <span class="sv" id="humidity">--%</span></div>
-              <div class="stat">💨 <span class="sv" id="wind">--</span><span id="wdir"></span></div>
-              <div class="stat">🔆 UV <span class="sv" id="uv">--</span></div>
-              <div class="stat">🌧️ <span class="sv" id="precip">--%</span><span id="precip-mm"></span></div>
-              <div class="stat" id="sun-stat"><span id="sun-icon">🌅</span> <span class="sv" id="sun-time">--:--</span></div>
+              <div class="stat"><span class="si">💧</span> <span class="sv" id="humidity">--%</span></div>
+              <div class="stat"><span class="si">💨</span> <span class="sv" id="wind">--</span><span id="wdir"></span></div>
+              <div class="stat"><span class="si">🔆</span> UV <span class="sv" id="uv">--</span></div>
+              <div class="stat"><span class="si">🌧️</span> <span class="sv" id="precip">--%</span><span id="precip-mm"></span></div>
+              <div class="stat" id="sun-stat" style="grid-column: span 2;">
+                <span class="si" id="sun-icon">🌅</span> <span class="sv" id="sun-time">--:--</span>
+              </div>
             </div>
-          </div>
 
+          </div>
         </div>
       </ha-card>
     `;
 
-    // Scroll-bewuste tap → more-info op weersblok
+    // Scroll-bewuste tap → more-info
     const tap = (el, fn) => {
       if (!el) return;
       let sy=0, sx=0, fired=false;
@@ -537,7 +546,7 @@ class DashboardHeaderCard extends HTMLElement {
     const attr  = ws.attributes;
     const state = ws.state;
 
-    // SVG animatie (alleen herschrijven als state veranderd)
+    // SVG (alleen herschrijven bij state-wijziging)
     const svgEl = $('wsvg');
     if (svgEl && svgEl.dataset.state !== state) {
       svgEl.dataset.state = state;
@@ -558,7 +567,7 @@ class DashboardHeaderCard extends HTMLElement {
     const he = $('humidity');
     if (he) he.textContent = attr.humidity !== undefined ? `${Math.round(attr.humidity)}%` : '--%';
 
-    // Wind snelheid + richting
+    // Wind
     const wie = $('wind');
     if (wie) {
       const sp = attr.wind_speed, ut = attr.wind_speed_unit || 'km/h';
@@ -567,11 +576,11 @@ class DashboardHeaderCard extends HTMLElement {
     const wde = $('wdir');
     if (wde) wde.textContent = windDir(attr.wind_bearing);
 
-    // UV index
+    // UV
     const uve = $('uv');
     if (uve) uve.textContent = attr.uv_index !== undefined ? attr.uv_index : '--';
 
-    // Neerslag (voorkeur forecast[0], anders attrs)
+    // Neerslag
     const todayFc = this._forecast?.[0];
     const pe = $('precip');
     if (pe) {
@@ -584,7 +593,7 @@ class DashboardHeaderCard extends HTMLElement {
       pme.textContent = mm !== undefined ? ` · ${mm}mm` : '';
     }
 
-    // ── Zon: eerstvolgende event (opkomst óf ondergang) ──
+    // Zon — eerstvolgende event
     const sunEnt = this._config.sun;
     if (sunEnt && this._hass) {
       const ss = this._hass.states[sunEnt];
