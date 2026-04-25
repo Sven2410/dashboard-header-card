@@ -246,7 +246,7 @@ const CARD_CSS = `
     flex: 1;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: flex-start;
     gap: 10px;
     min-width: 0;
     padding-left: 0;
