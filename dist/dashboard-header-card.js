@@ -188,7 +188,7 @@ const CARD_CSS = `
   .card-inner {
     display: flex;
     align-items: center;   /* rechterkolom verticaal gecentreerd */
-    gap: 16px;
+    gap: 0;
     padding: 10px 18px;
   }
 
@@ -249,6 +249,7 @@ const CARD_CSS = `
     justify-content: flex-end;
     gap: 10px;
     min-width: 0;
+    padding-left: 0;
   }
 
   /* Klikbaar weersblok: icon + temp + omschrijving */
