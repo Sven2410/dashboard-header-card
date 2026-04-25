@@ -1,9 +1,9 @@
 /**
- * dashboard-header-card  v1.1.0
- * Compacte Home Assistant header — Sven2410
+ * dashboard-header-card  v1.2.0
+ * Minimale transparante header — Sven2410
  */
 
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 console.info(
   `%c DASHBOARD-HEADER-CARD %c v${VERSION} `,
   'background:#026FA1;color:#fff;font-weight:bold;border-radius:3px 0 0 3px;padding:2px 6px;',
@@ -13,7 +13,6 @@ console.info(
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 const DAYS_FULL_NL  = ['Zondag','Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag'];
-const DAYS_SHORT_NL = ['Zo','Ma','Di','Wo','Do','Vr','Za'];
 const MONTHS_NL     = ['januari','februari','maart','april','mei','juni',
                         'juli','augustus','september','oktober','november','december'];
 
@@ -25,15 +24,8 @@ const STATE_LABELS_NL = {
   lightning:'Onweer','lightning-rainy':'Onweer met regen',exceptional:'Uitzonderlijk'
 };
 
-const FORECAST_EMOJI = {
-  sunny:'☀️','clear-night':'🌙',partlycloudy:'⛅',cloudy:'☁️',
-  rainy:'🌧️',pouring:'🌧️',snowy:'❄️','snowy-rainy':'🌨️',
-  windy:'💨','windy-variant':'💨',fog:'🌫️',hail:'🌨️',
-  lightning:'⛈️','lightning-rainy':'⛈️',exceptional:'⚠️'
-};
-
-const EXTREME    = new Set(['lightning','lightning-rainy','hail','pouring','snowy','exceptional']);
-const WIND_DIRS  = ['N','NO','O','ZO','Z','ZW','W','NW'];
+const EXTREME   = new Set(['lightning','lightning-rainy','hail','pouring','snowy','exceptional']);
+const WIND_DIRS = ['N','NO','O','ZO','Z','ZW','W','NW'];
 
 function getGreeting(h, name) {
   const g = h>=6&&h<12?'Goedemorgen':h>=12&&h<18?'Goedemiddag':h>=18?'Goedenavond':'Goedenacht';
@@ -49,242 +41,128 @@ function fmtHM(iso) {
 }
 function windDir(deg) {
   if (deg === undefined || deg === null) return '';
-  return WIND_DIRS[Math.round(deg / 45) % 8];
+  return ' ' + WIND_DIRS[Math.round(deg / 45) % 8];
 }
 
-// ─── WEATHER SVG ANIMATIONS (grijswaarden — past bij zwart/wit thema) ────────
+// Volgende zonevent: geeft { icon, time } terug op basis van next_rising vs next_setting
+function nextSunEvent(attr) {
+  const r = attr.next_rising  ? new Date(attr.next_rising).getTime()  : null;
+  const s = attr.next_setting ? new Date(attr.next_setting).getTime() : null;
+  if (!r && !s) return { icon:'🌅', time:'--:--' };
+  if (!s || (r && r < s)) return { icon:'🌅', time: fmtHM(attr.next_rising)  }; // zonsopkomst eerst
+  return                         { icon:'🌇', time: fmtHM(attr.next_setting) }; // zonsondergang eerst
+}
+
+// ─── WEATHER SVG ANIMATIONS ──────────────────────────────────────────────────
+// Kleuren via CSS-variabelen zodat ze meegaan met elk thema
 
 const SVG = {
-
-  sunny: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+  sunny:`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
     <style>
       .sc{animation:sp 3s ease-in-out infinite;transform-origin:30px 30px}
       .sr{animation:rr 12s linear infinite;transform-origin:30px 30px}
       @keyframes sp{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
       @keyframes rr{to{transform:rotate(360deg)}}
     </style>
-    <g class="sr">${[0,45,90,135,180,225,270,315].map(a=>{
-      const r=a*Math.PI/180,x1=(30+16*Math.sin(r)).toFixed(1),y1=(30-16*Math.cos(r)).toFixed(1),
-            x2=(30+23*Math.sin(r)).toFixed(1),y2=(30-23*Math.cos(r)).toFixed(1);
-      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--primary-text-color)" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>`;
-    }).join('')}</g>
-    <circle class="sc" cx="30" cy="30" r="11" fill="var(--primary-text-color)" opacity=".85"/>
+    <g class="sr">${[0,45,90,135,180,225,270,315].map(a=>{const r=a*Math.PI/180,x1=(30+16*Math.sin(r)).toFixed(1),y1=(30-16*Math.cos(r)).toFixed(1),x2=(30+23*Math.sin(r)).toFixed(1),y2=(30-23*Math.cos(r)).toFixed(1);return`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--primary-text-color)" stroke-width="2.5" stroke-linecap="round" opacity=".65"/>`;}).join('')}</g>
+    <circle class="sc" cx="30" cy="30" r="11" fill="var(--primary-text-color)" opacity=".8"/>
   </svg>`,
 
-  'clear-night': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .mn{animation:mg 4s ease-in-out infinite}
-      .st{animation:tw 2s ease-in-out infinite;transform-origin:center}
-      .s2{animation-delay:.7s}.s3{animation-delay:1.4s}.s4{animation-delay:.3s}
-      @keyframes mg{0%,100%{opacity:.9}50%{opacity:.55}}
-      @keyframes tw{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.15;transform:scale(.3)}}
-    </style>
-    <path class="mn" d="M35 10 A17 17 0 1 0 35 50 A12 12 0 1 1 35 10Z" fill="var(--primary-text-color)" opacity=".8"/>
-    <circle class="st s2" cx="12" cy="14" r="2"   fill="var(--primary-text-color)" opacity=".6"/>
-    <circle class="st s3" cx="48" cy="18" r="1.5" fill="var(--primary-text-color)" opacity=".6"/>
-    <circle class="st s4" cx="50" cy="40" r="1.8" fill="var(--primary-text-color)" opacity=".6"/>
+  'clear-night':`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.mn{animation:mg 4s ease-in-out infinite}.st{animation:tw 2s ease-in-out infinite}.s2{animation-delay:.7s}.s3{animation-delay:1.4s}.s4{animation-delay:.3s}@keyframes mg{0%,100%{opacity:.85}50%{opacity:.5}}@keyframes tw{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.1;transform:scale(.3)}}</style>
+    <path class="mn" d="M35 10 A17 17 0 1 0 35 50 A12 12 0 1 1 35 10Z" fill="var(--primary-text-color)" opacity=".75"/>
+    <circle class="st s2" cx="12" cy="14" r="2"   fill="var(--primary-text-color)" opacity=".5"/>
+    <circle class="st s3" cx="48" cy="18" r="1.5" fill="var(--primary-text-color)" opacity=".5"/>
+    <circle class="st s4" cx="50" cy="40" r="1.8" fill="var(--primary-text-color)" opacity=".5"/>
   </svg>`,
 
-  partlycloudy: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .ps{animation:sp 3s ease-in-out infinite;transform-origin:20px 24px}
-      .pc{animation:cf 4s ease-in-out infinite}
-      @keyframes sp{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
-      @keyframes cf{0%,100%{transform:translateX(0)}50%{transform:translateX(2px)}}
-    </style>
-    <circle class="ps" cx="20" cy="24" r="11" fill="var(--primary-text-color)" opacity=".5"/>
-    ${[0,45,90,135,180,225,270,315].map(a=>{
-      const r=a*Math.PI/180,x1=(20+12*Math.sin(r)).toFixed(1),y1=(24-12*Math.cos(r)).toFixed(1),
-            x2=(20+17*Math.sin(r)).toFixed(1),y2=(24-17*Math.cos(r)).toFixed(1);
-      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".35"/>`;
-    }).join('')}
-    <g class="pc">
-      <ellipse cx="38" cy="40" rx="17" ry="9" fill="var(--secondary-text-color)" opacity=".5"/>
-      <circle cx="26" cy="37" r="8" fill="var(--secondary-text-color)" opacity=".5"/>
-      <circle cx="40" cy="34" r="11" fill="var(--secondary-text-color)" opacity=".5"/>
-    </g>
+  partlycloudy:`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.ps{animation:sp 3s ease-in-out infinite;transform-origin:20px 24px}.pc{animation:cf 4s ease-in-out infinite}@keyframes sp{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}@keyframes cf{0%,100%{transform:translateX(0)}50%{transform:translateX(2px)}}</style>
+    <circle class="ps" cx="20" cy="24" r="11" fill="var(--primary-text-color)" opacity=".45"/>
+    ${[0,45,90,135,180,225,270,315].map(a=>{const r=a*Math.PI/180,x1=(20+12*Math.sin(r)).toFixed(1),y1=(24-12*Math.cos(r)).toFixed(1),x2=(20+17*Math.sin(r)).toFixed(1),y2=(24-17*Math.cos(r)).toFixed(1);return`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".3"/>`;}).join('')}
+    <g class="pc" opacity=".55"><ellipse cx="38" cy="40" rx="17" ry="9" fill="var(--secondary-text-color)"/><circle cx="26" cy="37" r="8" fill="var(--secondary-text-color)"/><circle cx="40" cy="34" r="11" fill="var(--secondary-text-color)"/></g>
   </svg>`,
 
-  cloudy: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .c1{animation:cf 4.5s ease-in-out infinite}
-      .c2{animation:cf 5.5s ease-in-out infinite reverse}
-      @keyframes cf{0%,100%{transform:translateX(0)}50%{transform:translateX(3px)}}
-    </style>
-    <g class="c2" opacity=".3">
-      <ellipse cx="26" cy="35" rx="14" ry="8" fill="var(--secondary-text-color)"/>
-      <circle cx="16" cy="31" r="7" fill="var(--secondary-text-color)"/>
-      <circle cx="28" cy="28" r="9" fill="var(--secondary-text-color)"/>
-    </g>
-    <g class="c1" opacity=".6">
-      <ellipse cx="36" cy="41" rx="18" ry="10" fill="var(--secondary-text-color)"/>
-      <circle cx="24" cy="37" r="9" fill="var(--secondary-text-color)"/>
-      <circle cx="38" cy="34" r="12" fill="var(--secondary-text-color)"/>
-    </g>
+  cloudy:`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.c1{animation:cf 4.5s ease-in-out infinite}.c2{animation:cf 5.5s ease-in-out infinite reverse}@keyframes cf{0%,100%{transform:translateX(0)}50%{transform:translateX(3px)}}</style>
+    <g class="c2" opacity=".28"><ellipse cx="26" cy="35" rx="14" ry="8" fill="var(--secondary-text-color)"/><circle cx="16" cy="31" r="7" fill="var(--secondary-text-color)"/><circle cx="28" cy="28" r="9" fill="var(--secondary-text-color)"/></g>
+    <g class="c1" opacity=".58"><ellipse cx="36" cy="41" rx="18" ry="10" fill="var(--secondary-text-color)"/><circle cx="24" cy="37" r="9" fill="var(--secondary-text-color)"/><circle cx="38" cy="34" r="12" fill="var(--secondary-text-color)"/></g>
   </svg>`,
 
-  rainy: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .rc{animation:cf 4s ease-in-out infinite}
-      .dr{animation:rf 1.3s linear infinite}
-      .dr:nth-child(3){animation-delay:.43s}
-      .dr:nth-child(4){animation-delay:.86s}
-      @keyframes cf{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}
-      @keyframes rf{0%{transform:translateY(0);opacity:.8}100%{transform:translateY(16px);opacity:0}}
-    </style>
-    <g class="rc" opacity=".6">
-      <ellipse cx="32" cy="28" rx="18" ry="10" fill="var(--secondary-text-color)"/>
-      <circle cx="20" cy="24" r="9" fill="var(--secondary-text-color)"/>
-      <circle cx="33" cy="21" r="12" fill="var(--secondary-text-color)"/>
-    </g>
+  rainy:`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.rc{animation:cf 4s ease-in-out infinite}.dr{animation:rf 1.3s linear infinite}.dr:nth-child(3){animation-delay:.43s}.dr:nth-child(4){animation-delay:.86s}@keyframes cf{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}@keyframes rf{0%{opacity:.7}100%{transform:translateY(16px);opacity:0}}</style>
+    <g class="rc" opacity=".55"><ellipse cx="32" cy="28" rx="18" ry="10" fill="var(--secondary-text-color)"/><circle cx="20" cy="24" r="9" fill="var(--secondary-text-color)"/><circle cx="33" cy="21" r="12" fill="var(--secondary-text-color)"/></g>
     <line class="dr" x1="20" y1="41" x2="17" y2="50" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
     <line class="dr" x1="31" y1="41" x2="28" y2="50" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
     <line class="dr" x1="42" y1="41" x2="39" y2="50" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
   </svg>`,
 
-  pouring: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .pc2{animation:sk .5s ease-in-out infinite alternate}
-      .pd{animation:ph .8s linear infinite}
-      .pd:nth-child(3){animation-delay:.16s}.pd:nth-child(4){animation-delay:.32s}
-      .pd:nth-child(5){animation-delay:.48s}.pd:nth-child(6){animation-delay:.64s}
-      @keyframes sk{0%{transform:translateX(-.8px)}100%{transform:translateX(.8px)}}
-      @keyframes ph{0%{transform:translateY(0);opacity:.8}100%{transform:translateY(16px);opacity:0}}
-    </style>
-    <g class="pc2" opacity=".65">
-      <ellipse cx="30" cy="25" rx="19" ry="11" fill="var(--secondary-text-color)"/>
-      <circle cx="17" cy="21" r="9" fill="var(--secondary-text-color)"/>
-      <circle cx="32" cy="18" r="12" fill="var(--secondary-text-color)"/>
-    </g>
-    <line class="pd" x1="14" y1="39" x2="11" y2="49" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".55"/>
-    <line class="pd" x1="23" y1="39" x2="20" y2="49" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".55"/>
-    <line class="pd" x1="32" y1="39" x2="29" y2="49" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".55"/>
-    <line class="pd" x1="41" y1="39" x2="38" y2="49" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".55"/>
-    <line class="pd" x1="50" y1="39" x2="47" y2="49" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+  pouring:`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.pc2{animation:sk .5s ease-in-out infinite alternate}.pd{animation:ph .8s linear infinite}.pd:nth-child(3){animation-delay:.16s}.pd:nth-child(4){animation-delay:.32s}.pd:nth-child(5){animation-delay:.48s}.pd:nth-child(6){animation-delay:.64s}@keyframes sk{0%{transform:translateX(-.8px)}100%{transform:translateX(.8px)}}@keyframes ph{0%{opacity:.7}100%{transform:translateY(16px);opacity:0}}</style>
+    <g class="pc2" opacity=".6"><ellipse cx="30" cy="25" rx="19" ry="11" fill="var(--secondary-text-color)"/><circle cx="17" cy="21" r="9" fill="var(--secondary-text-color)"/><circle cx="32" cy="18" r="12" fill="var(--secondary-text-color)"/></g>
+    <line class="pd" x1="14" y1="39" x2="11" y2="49" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+    <line class="pd" x1="23" y1="39" x2="20" y2="49" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+    <line class="pd" x1="32" y1="39" x2="29" y2="49" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+    <line class="pd" x1="41" y1="39" x2="38" y2="49" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+    <line class="pd" x1="50" y1="39" x2="47" y2="49" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
   </svg>`,
 
-  snowy: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .sc2{animation:cf 4s ease-in-out infinite}
-      .sf{animation:sf 2s linear infinite}
-      .sf:nth-child(3){animation-delay:.67s}.sf:nth-child(4){animation-delay:1.33s}
-      @keyframes cf{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}
-      @keyframes sf{0%{transform:translateY(0) rotate(0deg);opacity:.8}100%{transform:translateY(16px) rotate(180deg);opacity:0}}
-    </style>
-    <g class="sc2" opacity=".55">
-      <ellipse cx="30" cy="27" rx="18" ry="10" fill="var(--secondary-text-color)"/>
-      <circle cx="18" cy="23" r="9" fill="var(--secondary-text-color)"/>
-      <circle cx="32" cy="20" r="12" fill="var(--secondary-text-color)"/>
-    </g>
-    <text class="sf" x="18" y="49" font-size="11" fill="var(--primary-text-color)" text-anchor="middle" opacity=".7">❄</text>
-    <text class="sf" x="30" y="49" font-size="11" fill="var(--primary-text-color)" text-anchor="middle" opacity=".7">❄</text>
-    <text class="sf" x="43" y="49" font-size="11" fill="var(--primary-text-color)" text-anchor="middle" opacity=".7">❄</text>
+  snowy:`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.sc2{animation:cf 4s ease-in-out infinite}.sf{animation:sf 2s linear infinite}.sf:nth-child(3){animation-delay:.67s}.sf:nth-child(4){animation-delay:1.33s}@keyframes cf{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}@keyframes sf{0%{opacity:.75}100%{transform:translateY(16px) rotate(180deg);opacity:0}}</style>
+    <g class="sc2" opacity=".5"><ellipse cx="30" cy="27" rx="18" ry="10" fill="var(--secondary-text-color)"/><circle cx="18" cy="23" r="9" fill="var(--secondary-text-color)"/><circle cx="32" cy="20" r="12" fill="var(--secondary-text-color)"/></g>
+    <text class="sf" x="18" y="49" font-size="11" fill="var(--primary-text-color)" text-anchor="middle" opacity=".65">❄</text>
+    <text class="sf" x="30" y="49" font-size="11" fill="var(--primary-text-color)" text-anchor="middle" opacity=".65">❄</text>
+    <text class="sf" x="43" y="49" font-size="11" fill="var(--primary-text-color)" text-anchor="middle" opacity=".65">❄</text>
   </svg>`,
 
-  'snowy-rainy': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .src{animation:cf 4s ease-in-out infinite}
-      .srd{animation:rf 1.5s linear infinite}
-      .srf{animation:sf 2s linear infinite}
-      .srd:nth-child(3){animation-delay:.5s}.srf:nth-child(5){animation-delay:1s}
-      @keyframes cf{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}
-      @keyframes rf{0%{opacity:.7}100%{transform:translateY(15px);opacity:0}}
-      @keyframes sf{0%{opacity:.7}100%{transform:translateY(15px) rotate(180deg);opacity:0}}
-    </style>
-    <g class="src" opacity=".55">
-      <ellipse cx="30" cy="26" rx="18" ry="10" fill="var(--secondary-text-color)"/>
-      <circle cx="18" cy="22" r="9" fill="var(--secondary-text-color)"/>
-      <circle cx="32" cy="19" r="12" fill="var(--secondary-text-color)"/>
-    </g>
+  'snowy-rainy':`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.src{animation:cf 4s ease-in-out infinite}.srd{animation:rf 1.5s linear infinite}.srf{animation:sf 2s linear infinite}.srd:nth-child(3){animation-delay:.5s}.srf:nth-child(5){animation-delay:1s}@keyframes cf{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}@keyframes rf{0%{opacity:.65}100%{transform:translateY(15px);opacity:0}}@keyframes sf{0%{opacity:.65}100%{transform:translateY(15px) rotate(180deg);opacity:0}}</style>
+    <g class="src" opacity=".5"><ellipse cx="30" cy="26" rx="18" ry="10" fill="var(--secondary-text-color)"/><circle cx="18" cy="22" r="9" fill="var(--secondary-text-color)"/><circle cx="32" cy="19" r="12" fill="var(--secondary-text-color)"/></g>
     <line class="srd" x1="19" y1="39" x2="16" y2="48" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
     <line class="srd" x1="41" y1="39" x2="38" y2="48" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
-    <text class="srf" x="30" y="50" font-size="11" fill="var(--primary-text-color)" text-anchor="middle" opacity=".7">❄</text>
+    <text class="srf" x="30" y="50" font-size="11" fill="var(--primary-text-color)" text-anchor="middle" opacity=".65">❄</text>
   </svg>`,
 
-  windy: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .wl{animation:wb 2.2s ease-in-out infinite}
-      .wl2{animation:wb 2.8s ease-in-out infinite;animation-delay:.4s}
-      .wl3{animation:wb 3.2s ease-in-out infinite;animation-delay:.8s}
-      @keyframes wb{0%{transform:translateX(-3px);opacity:0}40%{opacity:.7}100%{transform:translateX(4px);opacity:0}}
-    </style>
+  windy:`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.wl{animation:wb 2.2s ease-in-out infinite}.wl2{animation:wb 2.8s ease-in-out infinite;animation-delay:.4s}.wl3{animation:wb 3.2s ease-in-out infinite;animation-delay:.8s}@keyframes wb{0%{transform:translateX(-3px);opacity:0}40%{opacity:.65}100%{transform:translateX(4px);opacity:0}}</style>
     <path class="wl"  d="M7 21 Q27 17 42 21 Q50 24 47 30 Q43 36 30 34" fill="none" stroke="var(--secondary-text-color)" stroke-width="2.8" stroke-linecap="round"/>
     <path class="wl2" d="M7 32 Q23 27 40 32 Q46 35 43 40" fill="none" stroke="var(--secondary-text-color)" stroke-width="2.3" stroke-linecap="round"/>
     <path class="wl3" d="M11 43 Q32 38 48 43" fill="none" stroke="var(--secondary-text-color)" stroke-width="2" stroke-linecap="round"/>
   </svg>`,
 
-  fog: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .fl{animation:fd 3s ease-in-out infinite}
-      .fl2{animation:fd 3.5s ease-in-out infinite;animation-delay:1s}
-      .fl3{animation:fd 4s ease-in-out infinite;animation-delay:2s}
-      @keyframes fd{0%,100%{transform:translateX(0);opacity:.25}50%{transform:translateX(5px);opacity:.55}}
-    </style>
+  fog:`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.fl{animation:fd 3s ease-in-out infinite}.fl2{animation:fd 3.5s ease-in-out infinite;animation-delay:1s}.fl3{animation:fd 4s ease-in-out infinite;animation-delay:2s}@keyframes fd{0%,100%{transform:translateX(0);opacity:.22}50%{transform:translateX(5px);opacity:.5}}</style>
     <rect class="fl"  x="5"  y="18" width="50" height="6" rx="3" fill="var(--secondary-text-color)"/>
     <rect class="fl2" x="10" y="29" width="42" height="6" rx="3" fill="var(--secondary-text-color)"/>
     <rect class="fl3" x="5"  y="40" width="46" height="6" rx="3" fill="var(--secondary-text-color)"/>
   </svg>`,
 
-  hail: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .hc{animation:cf 3s ease-in-out infinite}
-      .hs{animation:hf 1s linear infinite}
-      .hs:nth-child(3){animation-delay:.33s}.hs:nth-child(4){animation-delay:.66s}
-      @keyframes cf{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}
-      @keyframes hf{0%{transform:translateY(0);opacity:.8}100%{transform:translateY(15px);opacity:0}}
-    </style>
-    <g class="hc" opacity=".55">
-      <ellipse cx="30" cy="26" rx="18" ry="10" fill="var(--secondary-text-color)"/>
-      <circle cx="18" cy="22" r="9" fill="var(--secondary-text-color)"/>
-      <circle cx="32" cy="19" r="12" fill="var(--secondary-text-color)"/>
-    </g>
-    <circle class="hs" cx="19" cy="41" r="4" fill="var(--secondary-text-color)" stroke="var(--primary-text-color)" stroke-width="1.2" opacity=".7"/>
-    <circle class="hs" cx="30" cy="41" r="4" fill="var(--secondary-text-color)" stroke="var(--primary-text-color)" stroke-width="1.2" opacity=".7"/>
-    <circle class="hs" cx="42" cy="41" r="4" fill="var(--secondary-text-color)" stroke="var(--primary-text-color)" stroke-width="1.2" opacity=".7"/>
+  hail:`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.hc{animation:cf 3s ease-in-out infinite}.hs{animation:hf 1s linear infinite}.hs:nth-child(3){animation-delay:.33s}.hs:nth-child(4){animation-delay:.66s}@keyframes cf{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}@keyframes hf{0%{opacity:.75}100%{transform:translateY(15px);opacity:0}}</style>
+    <g class="hc" opacity=".5"><ellipse cx="30" cy="26" rx="18" ry="10" fill="var(--secondary-text-color)"/><circle cx="18" cy="22" r="9" fill="var(--secondary-text-color)"/><circle cx="32" cy="19" r="12" fill="var(--secondary-text-color)"/></g>
+    <circle class="hs" cx="19" cy="41" r="4" fill="var(--secondary-text-color)" stroke="var(--primary-text-color)" stroke-width="1.2" opacity=".65"/>
+    <circle class="hs" cx="30" cy="41" r="4" fill="var(--secondary-text-color)" stroke="var(--primary-text-color)" stroke-width="1.2" opacity=".65"/>
+    <circle class="hs" cx="42" cy="41" r="4" fill="var(--secondary-text-color)" stroke="var(--primary-text-color)" stroke-width="1.2" opacity=".65"/>
   </svg>`,
 
-  lightning: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .lc{animation:ld .6s ease-in-out infinite alternate}
-      .bolt{animation:lf 2s ease-in-out infinite}
-      @keyframes ld{0%{opacity:.45}100%{opacity:.65}}
-      @keyframes lf{0%,87%,100%{opacity:0}89%,93%{opacity:1}91%{opacity:.15}}
-    </style>
-    <g class="lc">
-      <ellipse cx="30" cy="24" rx="20" ry="11" fill="var(--secondary-text-color)"/>
-      <circle cx="17" cy="20" r="10" fill="var(--secondary-text-color)"/>
-      <circle cx="33" cy="17" r="13" fill="var(--secondary-text-color)"/>
-    </g>
+  lightning:`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.lc{animation:ld .6s ease-in-out infinite alternate}.bolt{animation:lf 2s ease-in-out infinite}@keyframes ld{0%{opacity:.42}100%{opacity:.62}}@keyframes lf{0%,87%,100%{opacity:0}89%,93%{opacity:1}91%{opacity:.12}}</style>
+    <g class="lc"><ellipse cx="30" cy="24" rx="20" ry="11" fill="var(--secondary-text-color)"/><circle cx="17" cy="20" r="10" fill="var(--secondary-text-color)"/><circle cx="33" cy="17" r="13" fill="var(--secondary-text-color)"/></g>
     <polygon class="bolt" points="34,36 28,36 31,46 25,46 33,57 30,47 37,47" fill="var(--primary-text-color)"/>
   </svg>`,
 
-  'lightning-rainy': `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .lrc{animation:ld .6s ease-in-out infinite alternate}
-      .lrd{animation:rf 1.3s linear infinite}
-      .lrd:nth-child(3){animation-delay:.43s}
-      .lrbolt{animation:lf 2s ease-in-out infinite}
-      @keyframes ld{0%{opacity:.45}100%{opacity:.65}}
-      @keyframes rf{0%{opacity:.6}100%{transform:translateY(14px);opacity:0}}
-      @keyframes lf{0%,87%,100%{opacity:0}89%,93%{opacity:1}91%{opacity:.15}}
-    </style>
-    <g class="lrc">
-      <ellipse cx="30" cy="22" rx="20" ry="11" fill="var(--secondary-text-color)"/>
-      <circle cx="17" cy="18" r="10" fill="var(--secondary-text-color)"/>
-      <circle cx="33" cy="15" r="13" fill="var(--secondary-text-color)"/>
-    </g>
-    <line class="lrd" x1="15" y1="36" x2="12" y2="45" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
-    <line class="lrd" x1="47" y1="36" x2="44" y2="45" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".5"/>
+  'lightning-rainy':`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.lrc{animation:ld .6s ease-in-out infinite alternate}.lrd{animation:rf 1.3s linear infinite}.lrd:nth-child(3){animation-delay:.43s}.lrbolt{animation:lf 2s ease-in-out infinite}@keyframes ld{0%{opacity:.42}100%{opacity:.62}}@keyframes rf{0%{opacity:.55}100%{transform:translateY(14px);opacity:0}}@keyframes lf{0%,87%,100%{opacity:0}89%,93%{opacity:1}91%{opacity:.12}}</style>
+    <g class="lrc"><ellipse cx="30" cy="22" rx="20" ry="11" fill="var(--secondary-text-color)"/><circle cx="17" cy="18" r="10" fill="var(--secondary-text-color)"/><circle cx="33" cy="15" r="13" fill="var(--secondary-text-color)"/></g>
+    <line class="lrd" x1="15" y1="36" x2="12" y2="45" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".45"/>
+    <line class="lrd" x1="47" y1="36" x2="44" y2="45" stroke="var(--primary-text-color)" stroke-width="2" stroke-linecap="round" opacity=".45"/>
     <polygon class="lrbolt" points="33,34 27,34 30,43 24,43 32,54 29,44 36,44" fill="var(--primary-text-color)"/>
   </svg>`,
 
-  exceptional: `<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
-    <style>
-      .exc{animation:ep 1.2s ease-in-out infinite;transform-origin:30px 30px}
-      @keyframes ep{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.12);opacity:.4}}
-    </style>
+  exceptional:`<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
+    <style>.exc{animation:ep 1.2s ease-in-out infinite;transform-origin:30px 30px}@keyframes ep{0%,100%{transform:scale(1);opacity:.75}50%{transform:scale(1.12);opacity:.35}}</style>
     <circle class="exc" cx="30" cy="30" r="22" fill="none" stroke="var(--primary-text-color)" stroke-width="2.5"/>
-    <text x="30" y="40" font-size="24" text-anchor="middle" fill="var(--primary-text-color)" font-weight="bold" opacity=".8">!</text>
+    <text x="30" y="40" font-size="24" text-anchor="middle" fill="var(--primary-text-color)" font-weight="bold" opacity=".75">!</text>
   </svg>`
 };
 
@@ -297,18 +175,32 @@ function getWeatherSVG(state) {
 // ─── CSS ─────────────────────────────────────────────────────────────────────
 
 const CARD_CSS = `
-  :host { display: block; width: 100%; }
-  ha-card { padding: 0; overflow: hidden; }
+  :host {
+    display: block;
+    width: 100%;
+  }
 
-  .wrap { padding: 12px 20px 10px; }
+  /* Neutraliseer ha-card volledig — geen achtergrond, geen shadow, geen border */
+  ha-card {
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
 
-  /* ── ROW 1: begroeting | klok ── */
+  .wrap {
+    padding: 10px 18px 10px;
+  }
+
+  /* ── ROW 1: begroeting + datum | klok ── */
   .row1 {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
 
   .greeting {
@@ -325,7 +217,7 @@ const CARD_CSS = `
     white-space: nowrap;
   }
 
-  /* Dik condensed klok-lettertype */
+  /* Dik condensed lettertype voor de klok */
   .clock {
     font-family: 'Arial Black', 'Impact', 'Haettenschweiler', sans-serif;
     font-size: 2.4rem;
@@ -343,8 +235,8 @@ const CARD_CSS = `
     display: flex;
     align-items: center;
     gap: 10px;
-    flex-wrap: wrap;
     min-height: 44px;
+    flex-wrap: wrap;
   }
 
   /* Klikbaar weersblok */
@@ -356,7 +248,7 @@ const CARD_CSS = `
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
     min-height: 44px;
-    padding: 2px 8px 2px 2px;
+    padding: 2px 6px 2px 2px;
     border-radius: 10px;
     transition: background .18s;
     flex-shrink: 0;
@@ -382,7 +274,7 @@ const CARD_CSS = `
   .warn-badge.show { display: block; }
   @keyframes warn-pulse {
     0%,100%{transform:scale(1);opacity:1}
-    50%{transform:scale(1.5);opacity:.35}
+    50%{transform:scale(1.5);opacity:.3}
   }
 
   .temperature {
@@ -398,7 +290,7 @@ const CARD_CSS = `
     white-space: nowrap;
   }
 
-  /* Verticale scheidingslijn */
+  /* Verticale scheidingslijn tussen weer en stats */
   .vdiv {
     width: 1px;
     height: 28px;
@@ -429,53 +321,11 @@ const CARD_CSS = `
     margin: 0 1px;
   }
 
-  /* ── SCHEIDINGSLIJN ── */
-  .divider {
-    height: 1px;
-    background: var(--divider-color, rgba(128,128,128,0.15));
-    margin: 10px 0 8px;
-  }
-
-  /* ── VOORSPELLING ── */
-  .forecast-row {
-    display: flex;
-    gap: 4px;
-    overflow-x: auto;
-    padding-bottom: 2px;
-    scrollbar-width: none;
-  }
-  .forecast-row::-webkit-scrollbar { display: none; }
-
-  .fc-day {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 3px;
-    flex: 1;
-    min-width: 48px;
-    padding: 6px 3px;
-    border-radius: 10px;
-    background: rgba(128,128,128,0.055);
-  }
-  .fc-name {
-    font-size: 0.62rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-    color: var(--secondary-text-color);
-  }
-  .fc-icon    { font-size: 1.1rem; line-height: 1; }
-  .fc-hi      { font-weight: 700; font-size: 0.75rem; color: var(--primary-text-color); }
-  .fc-lo      { font-size: 0.67rem; color: var(--secondary-text-color); margin-left: 2px; }
-  .fc-precip  { font-size: 0.62rem; font-weight: 600; color: var(--secondary-text-color); opacity: .75; }
-
   @media (max-width: 380px) {
-    .wrap { padding: 10px 14px 8px; }
-    .clock { font-size: 1.9rem; }
+    .wrap     { padding: 8px 12px 8px; }
+    .clock    { font-size: 1.9rem; }
     .greeting { font-size: 0.85rem; }
-    .stats { gap: 3px 10px; }
-    .fc-day { min-width: 40px; }
-    .fc-icon { font-size: 0.95rem; }
+    .stats    { gap: 3px 10px; }
   }
 `;
 
@@ -563,7 +413,8 @@ class DashboardHeaderCard extends HTMLElement {
 
   _startTick() {
     if (this._tickInterval) return;
-    this._tickInterval = setInterval(() => this._updateDOM(), 10000); // elke 10s voldoende (geen seconden)
+    // Elke minuut updaten — geen seconden
+    this._tickInterval = setInterval(() => this._updateDOM(), 60000);
   }
   _stopTick() {
     if (this._tickInterval) { clearInterval(this._tickInterval); this._tickInterval = null; }
@@ -573,11 +424,11 @@ class DashboardHeaderCard extends HTMLElement {
     if (!this._hass || !entity) return;
     if (this._forecastUnsub) { try { this._forecastUnsub(); } catch(_){} this._forecastUnsub = null; }
     this._hass.connection.subscribeMessage(
-      msg => { if (msg?.forecast) { this._forecast = msg.forecast; if (this._domBuilt) this._updateForecast(); } },
+      msg => { if (msg?.forecast) { this._forecast = msg.forecast; } },
       { type:'weather/subscribe_forecast', forecast_type:'daily', entity_id:entity }
     ).then(u => { this._forecastUnsub = u; }).catch(() => {
       const st = this._hass?.states[entity];
-      if (st?.attributes.forecast) { this._forecast = st.attributes.forecast; if (this._domBuilt) this._updateForecast(); }
+      if (st?.attributes.forecast) this._forecast = st.attributes.forecast;
     });
   }
 
@@ -592,70 +443,60 @@ class DashboardHeaderCard extends HTMLElement {
       <style>${CARD_CSS}</style>
       <ha-card>
         <div class="wrap">
-          <div class="content">
 
-            <!-- ROW 1: begroeting + datum | klok -->
-            <div class="row1">
-              <div>
-                <div class="greeting" id="greeting">Goedemorgen!</div>
-                <div class="date-str" id="date-str">...</div>
-              </div>
-              <div class="clock" id="clock">00:00</div>
+          <!-- ROW 1: begroeting + datum | klok -->
+          <div class="row1">
+            <div>
+              <div class="greeting" id="greeting">Goedemorgen!</div>
+              <div class="date-str" id="date-str">...</div>
             </div>
-
-            <!-- ROW 2: weer + stats -->
-            <div class="row2">
-              <div class="weather-block" id="weather-block">
-                <div class="weather-icon-wrap">
-                  <div id="wsvg" style="width:100%;height:100%"></div>
-                  <div class="warn-badge" id="warn"></div>
-                </div>
-                <div>
-                  <div class="temperature" id="temp">--°</div>
-                  <div class="wdesc"        id="wdesc">--</div>
-                </div>
-              </div>
-
-              <div class="vdiv"></div>
-
-              <div class="stats">
-                <div class="stat">💧 <span class="sv" id="humidity">--%</span></div>
-                <div class="stat">💨 <span class="sv" id="wind">--</span><span id="wdir"></span></div>
-                <div class="stat">🔆 UV <span class="sv" id="uv">--</span></div>
-                <div class="stat">🌧️ <span class="sv" id="precip">--%</span><span id="precip-mm"></span></div>
-                <div class="stat">🌅 <span class="sv" id="sunrise">--:--</span></div>
-                <div class="stat">🌇 <span class="sv" id="sunset">--:--</span></div>
-              </div>
-            </div>
-
-            <div class="divider"></div>
-
-            <!-- VOORSPELLING -->
-            <div class="forecast-row" id="forecast-row">
-              <div class="fc-day" style="justify-content:center;color:var(--secondary-text-color);font-size:.7rem;flex:1;">Laden…</div>
-            </div>
-
+            <div class="clock" id="clock">00:00</div>
           </div>
+
+          <!-- ROW 2: weer | stats -->
+          <div class="row2">
+            <div class="weather-block" id="weather-block">
+              <div class="weather-icon-wrap">
+                <div id="wsvg" style="width:100%;height:100%"></div>
+                <div class="warn-badge" id="warn"></div>
+              </div>
+              <div>
+                <div class="temperature" id="temp">--°</div>
+                <div class="wdesc"        id="wdesc">--</div>
+              </div>
+            </div>
+
+            <div class="vdiv"></div>
+
+            <div class="stats">
+              <div class="stat">💧 <span class="sv" id="humidity">--%</span></div>
+              <div class="stat">💨 <span class="sv" id="wind">--</span><span id="wdir"></span></div>
+              <div class="stat">🔆 UV <span class="sv" id="uv">--</span></div>
+              <div class="stat">🌧️ <span class="sv" id="precip">--%</span><span id="precip-mm"></span></div>
+              <div class="stat" id="sun-stat"><span id="sun-icon">🌅</span> <span class="sv" id="sun-time">--:--</span></div>
+            </div>
+          </div>
+
         </div>
       </ha-card>
     `;
 
-    // Scroll-bewuste tap → more-info
+    // Scroll-bewuste tap → more-info op weersblok
     const tap = (el, fn) => {
       if (!el) return;
       let sy=0, sx=0, fired=false;
-      el.addEventListener('touchstart', e => { sy=e.touches[0].clientY; sx=e.touches[0].clientX; fired=false; }, {passive:true});
-      el.addEventListener('touchend', e => {
-        if (Math.abs(e.changedTouches[0].clientY-sy)>8||Math.abs(e.changedTouches[0].clientX-sx)>8) return;
-        e.preventDefault(); fired=true; fn();
-      }, {passive:false});
-      el.addEventListener('click', () => { if(fired){fired=false;return;} fn(); });
+      el.addEventListener('touchstart', e=>{sy=e.touches[0].clientY;sx=e.touches[0].clientX;fired=false;},{passive:true});
+      el.addEventListener('touchend', e=>{
+        if(Math.abs(e.changedTouches[0].clientY-sy)>8||Math.abs(e.changedTouches[0].clientX-sx)>8) return;
+        e.preventDefault();fired=true;fn();
+      },{passive:false});
+      el.addEventListener('click',()=>{if(fired){fired=false;return;}fn();});
     };
 
     tap(sr.getElementById('weather-block'), () => {
       if (!this._config.weather || !this._hass) return;
-      this.dispatchEvent(new CustomEvent('hass-more-info', {
-        detail:{ entityId: this._config.weather }, bubbles:true, composed:true
+      this.dispatchEvent(new CustomEvent('hass-more-info',{
+        detail:{entityId:this._config.weather},bubbles:true,composed:true
       }));
     });
   }
@@ -668,7 +509,7 @@ class DashboardHeaderCard extends HTMLElement {
     const now  = new Date();
     const hour = now.getHours();
 
-    // Klok — HH:MM (geen seconden)
+    // Klok HH:MM
     const cl = $('clock');
     if (cl) cl.textContent = `${String(hour).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
@@ -676,7 +517,7 @@ class DashboardHeaderCard extends HTMLElement {
     const de = $('date-str');
     if (de) de.textContent = formatDate(now);
 
-    // Begroeting
+    // Begroeting + persoonsnaam
     const ge = $('greeting');
     if (ge) {
       let name = '';
@@ -689,14 +530,14 @@ class DashboardHeaderCard extends HTMLElement {
 
     // ── Weer ──
     const we = this._config.weather;
-    if (!we || !this._hass) { this._updateForecast(); return; }
+    if (!we || !this._hass) return;
     const ws = this._hass.states[we];
-    if (!ws)                { this._updateForecast(); return; }
+    if (!ws) return;
 
     const attr  = ws.attributes;
     const state = ws.state;
 
-    // SVG (herschrijf alleen bij state-wijziging)
+    // SVG animatie (alleen herschrijven als state veranderd)
     const svgEl = $('wsvg');
     if (svgEl && svgEl.dataset.state !== state) {
       svgEl.dataset.state = state;
@@ -707,11 +548,9 @@ class DashboardHeaderCard extends HTMLElement {
     const badge = $('warn');
     if (badge) badge.classList.toggle('show', EXTREME.has(state));
 
-    // Temperatuur
+    // Temperatuur & omschrijving
     const te = $('temp');
     if (te) te.textContent = attr.temperature !== undefined ? `${Math.round(attr.temperature)}°` : '--°';
-
-    // Omschrijving
     const wd = $('wdesc');
     if (wd) wd.textContent = STATE_LABELS_NL[state] || state;
 
@@ -719,23 +558,20 @@ class DashboardHeaderCard extends HTMLElement {
     const he = $('humidity');
     if (he) he.textContent = attr.humidity !== undefined ? `${Math.round(attr.humidity)}%` : '--%';
 
-    // Wind
+    // Wind snelheid + richting
     const wie = $('wind');
     if (wie) {
-      const sp = attr.wind_speed;
-      const ut = attr.wind_speed_unit || 'km/h';
-      wie.textContent = sp !== undefined
-        ? `${ut === 'm/s' ? Math.round(sp*3.6) : Math.round(sp)} km/h`
-        : '--';
+      const sp = attr.wind_speed, ut = attr.wind_speed_unit || 'km/h';
+      wie.textContent = sp !== undefined ? `${ut==='m/s'?Math.round(sp*3.6):Math.round(sp)} km/h` : '--';
     }
     const wde = $('wdir');
-    if (wde) wde.textContent = windDir(attr.wind_bearing) ? ` ${windDir(attr.wind_bearing)}` : '';
+    if (wde) wde.textContent = windDir(attr.wind_bearing);
 
-    // UV
+    // UV index
     const uve = $('uv');
     if (uve) uve.textContent = attr.uv_index !== undefined ? attr.uv_index : '--';
 
-    // Neerslag
+    // Neerslag (voorkeur forecast[0], anders attrs)
     const todayFc = this._forecast?.[0];
     const pe = $('precip');
     if (pe) {
@@ -748,65 +584,16 @@ class DashboardHeaderCard extends HTMLElement {
       pme.textContent = mm !== undefined ? ` · ${mm}mm` : '';
     }
 
-    // ── Zon ──
+    // ── Zon: eerstvolgende event (opkomst óf ondergang) ──
     const sunEnt = this._config.sun;
     if (sunEnt && this._hass) {
       const ss = this._hass.states[sunEnt];
       if (ss) {
-        const sa       = ss.attributes;
-        const isAbove  = ss.state === 'above_horizon';
-        const nextRMs  = sa.next_rising ? new Date(sa.next_rising).getTime() : null;
-
-        // Als zon boven horizon is: next_rising is morgen → 24u aftrekken voor vandaag's opkomst
-        const todaySunriseMs = (isAbove && nextRMs) ? nextRMs - 86400000 : nextRMs;
-
-        const rie = $('sunrise');
-        const see = $('sunset');
-        if (rie) rie.textContent = todaySunriseMs ? fmtHM(new Date(todaySunriseMs).toISOString()) : '--:--';
-        if (see) see.textContent = sa.next_setting ? fmtHM(sa.next_setting) : '--:--';
+        const ev = nextSunEvent(ss.attributes);
+        const si = $('sun-icon'); if (si) si.textContent = ev.icon;
+        const st = $('sun-time'); if (st) st.textContent = ev.time;
       }
     }
-
-    this._updateForecast();
-  }
-
-  _updateForecast() {
-    const sr = this.shadowRoot;
-    if (!sr) return;
-    const fcRow = sr.getElementById('forecast-row');
-    if (!fcRow) return;
-
-    let fc = this._forecast;
-    if (!fc?.length && this._config.weather && this._hass) {
-      const ws = this._hass.states[this._config.weather];
-      if (ws?.attributes.forecast) fc = ws.attributes.forecast;
-    }
-
-    if (!fc?.length) {
-      fcRow.innerHTML = `<div style="color:var(--secondary-text-color);font-size:.7rem;padding:4px 0;">Geen voorspelling beschikbaar</div>`;
-      return;
-    }
-
-    const today = new Date().toDateString();
-    fcRow.innerHTML = fc.slice(0,5).map(day => {
-      const d    = new Date(day.datetime);
-      const name = d.toDateString()===today ? 'Vandaag' : DAYS_SHORT_NL[d.getDay()];
-      const icon = FORECAST_EMOJI[day.condition] || '🌤️';
-      const hi   = day.temperature !== undefined ? `${Math.round(day.temperature)}°` : '-°';
-      const lo   = day.templow     !== undefined ? `${Math.round(day.templow)}°`     : '';
-      const pct  = day.precipitation_probability !== undefined
-                   ? `${Math.round(day.precipitation_probability)}%` : '';
-      const mm   = day.precipitation !== undefined ? ` · ${day.precipitation}mm` : '';
-
-      return `<div class="fc-day">
-        <div class="fc-name">${name}</div>
-        <div class="fc-icon">${icon}</div>
-        <div style="display:flex;align-items:baseline">
-          <span class="fc-hi">${hi}</span>${lo?`<span class="fc-lo">${lo}</span>`:''}
-        </div>
-        ${pct?`<div class="fc-precip">${pct}${mm}</div>`:''}
-      </div>`;
-    }).join('');
   }
 }
 
@@ -823,7 +610,7 @@ if (!window.customCards.find(c => c.type === 'dashboard-header-card')) {
   window.customCards.push({
     type:        'dashboard-header-card',
     name:        'Dashboard Header Kaart',
-    description: 'Compacte header met klok, weer, begroeting en 5-daagse voorspelling',
+    description: 'Compacte transparante header met klok, weer en begroeting',
     preview:     false,
   });
 }
