@@ -1,9 +1,9 @@
 /**
- * dashboard-header-card  v1.4.1
+ * dashboard-header-card  v1.4.2
  * Compacte transparante header — Sven2410
  */
 
-const VERSION = '1.4.1';
+const VERSION = '1.4.2';
 console.info(
   `%c DASHBOARD-HEADER-CARD %c v${VERSION} `,
   'background:#026FA1;color:#fff;font-weight:bold;border-radius:3px 0 0 3px;padding:2px 6px;',
@@ -182,7 +182,7 @@ const CARD_CSS = `
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0;
+    gap: 24px;
     padding: 10px 18px;
   }
 
@@ -191,6 +191,7 @@ const CARD_CSS = `
     flex-direction: column;
     gap: 3px;
     flex-shrink: 0;
+    min-width: 0;
   }
 
   .greeting {
@@ -237,7 +238,6 @@ const CARD_CSS = `
     justify-content: flex-start;
     gap: 10px;
     min-width: 0;
-    padding-left: 0;
   }
 
   .weather-block {
@@ -321,7 +321,7 @@ const CARD_CSS = `
   }
 
   @media (max-width: 480px) {
-    .card-inner { padding: 8px 12px; gap: 10px; }
+    .card-inner { padding: 8px 12px; gap: 12px; }
     .stats      { gap: 7px; }
     .wdesc      { display: none; }
   }
