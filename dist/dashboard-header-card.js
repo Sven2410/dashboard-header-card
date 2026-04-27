@@ -1,9 +1,9 @@
 /**
- * dashboard-header-card  v1.4.0
+ * dashboard-header-card  v1.4.1
  * Compacte transparante header — Sven2410
  */
 
-const VERSION = '1.4.0';
+const VERSION = '1.4.1';
 console.info(
   `%c DASHBOARD-HEADER-CARD %c v${VERSION} `,
   'background:#026FA1;color:#fff;font-weight:bold;border-radius:3px 0 0 3px;padding:2px 6px;',
@@ -178,13 +178,6 @@ const CARD_CSS = `
     -webkit-backdrop-filter: none !important;
   }
 
-  /*
-   * HOOFD LAYOUT
-   * Links:  [regel 1] Goedemorgen, Sven!
-   *         [regel 2] 21:23  |  Zaterdag 25 april 2026
-   * Rechts: [1 regel] icon · temp · omschr  |  💧 💨 🔆 🌧️ 🌅
-   *         gecentreerd t.o.v. de 2 linker regels
-   */
   .card-inner {
     display: flex;
     align-items: center;
@@ -193,7 +186,6 @@ const CARD_CSS = `
     padding: 10px 18px;
   }
 
-  /* ── LINKER KOLOM ── */
   .left-col {
     display: flex;
     flex-direction: column;
@@ -209,7 +201,6 @@ const CARD_CSS = `
     white-space: nowrap;
   }
 
-  /* Klok + scheidingslijn + datum op 1 regel */
   .time-date {
     display: flex;
     align-items: center;
@@ -217,7 +208,6 @@ const CARD_CSS = `
     line-height: 1;
   }
 
-  /* Tijd: zelfde gewicht als begroeting */
   .clock {
     font-size: 0.95rem;
     font-weight: 700;
@@ -227,7 +217,6 @@ const CARD_CSS = `
     white-space: nowrap;
   }
 
-  /* Dunne verticale scheidingslijn tussen tijd en datum */
   .td-sep {
     display: inline-block;
     width: 1px;
@@ -242,7 +231,6 @@ const CARD_CSS = `
     white-space: nowrap;
   }
 
-  /* ── RECHTER KOLOM: 1 horizontale regel ── */
   .right-col {
     display: flex;
     align-items: center;
@@ -252,7 +240,6 @@ const CARD_CSS = `
     padding-left: 0;
   }
 
-  /* Klikbaar weersblok: icon + temp + omschrijving */
   .weather-block {
     display: flex;
     align-items: center;
@@ -303,7 +290,6 @@ const CARD_CSS = `
     white-space: nowrap;
   }
 
-  /* Verticale scheidingslijn weer | stats */
   .vdiv {
     width: 1px;
     height: 22px;
@@ -311,7 +297,6 @@ const CARD_CSS = `
     flex-shrink: 0;
   }
 
-  /* Stats: alles op 1 horizontale regel */
   .stats {
     display: flex;
     align-items: center;
@@ -338,7 +323,7 @@ const CARD_CSS = `
   @media (max-width: 480px) {
     .card-inner { padding: 8px 12px; gap: 10px; }
     .stats      { gap: 7px; }
-    .wdesc      { display: none; }   /* omschrijving weglaten op kleine schermen */
+    .wdesc      { display: none; }
   }
 `;
 
@@ -456,17 +441,15 @@ class DashboardHeaderCard extends HTMLElement {
       <ha-card>
         <div class="card-inner">
 
-          <!-- LINKS: begroeting  /  klok | datum -->
           <div class="left-col">
             <div class="greeting" id="greeting">Goedemorgen!</div>
             <div class="time-date">
-              <span class="clock"   id="clock">00:00</span>
+              <span class="clock"    id="clock">00:00</span>
               <span class="td-sep"></span>
               <span class="date-str" id="date-str">...</span>
             </div>
           </div>
 
-          <!-- RECHTS: [icon · temp · desc]  |  [💧 💨 🔆 🌧️ 🌅]  -->
           <div class="right-col">
 
             <div class="weather-block" id="weather-block">
@@ -476,7 +459,7 @@ class DashboardHeaderCard extends HTMLElement {
               </div>
               <div>
                 <div class="temperature" id="temp">--°</div>
-                <div class="wdesc"        id="wdesc">--</div>
+                <div class="wdesc"       id="wdesc">--</div>
               </div>
             </div>
 
@@ -486,7 +469,7 @@ class DashboardHeaderCard extends HTMLElement {
               <div class="stat"><span class="si">💧</span><span class="sv" id="humidity">--%</span></div>
               <div class="stat"><span class="si">💨</span><span class="sv" id="wind">--</span><span id="wdir"></span></div>
               <div class="stat"><span class="si">🔆</span>UV&nbsp;<span class="sv" id="uv">--</span></div>
-              <div class="stat"><span class="si">🌧️</span><span class="sv" id="precip">--%</span><span id="precip-mm"></span></div>
+              <div class="stat"><span class="si">🌧️</span><span class="sv" id="precip-mm">--</span></div>
               <div class="stat"><span class="si" id="sun-icon">🌅</span><span class="sv" id="sun-time">--:--</span></div>
             </div>
 
@@ -495,7 +478,6 @@ class DashboardHeaderCard extends HTMLElement {
       </ha-card>
     `;
 
-    // Scroll-bewuste tap → more-info
     const tap = (el, fn) => {
       if (!el) return;
       let sy=0, sx=0, fired=false;
@@ -523,15 +505,12 @@ class DashboardHeaderCard extends HTMLElement {
     const now  = new Date();
     const hour = now.getHours();
 
-    // Klok HH:MM
     const cl = $('clock');
     if (cl) cl.textContent = `${String(hour).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
-    // Datum
     const de = $('date-str');
     if (de) de.textContent = formatDate(now);
 
-    // Begroeting
     const ge = $('greeting');
     if (ge) {
       let name = '';
@@ -542,7 +521,6 @@ class DashboardHeaderCard extends HTMLElement {
       ge.textContent = getGreeting(hour, name);
     }
 
-    // ── Weer ──
     const we = this._config.weather;
     if (!we || !this._hass) return;
     const ws = this._hass.states[we];
@@ -580,18 +558,12 @@ class DashboardHeaderCard extends HTMLElement {
     if (uve) uve.textContent = attr.uv_index !== undefined ? attr.uv_index : '--';
 
     const todayFc = this._forecast?.[0];
-    const pe = $('precip');
-    if (pe) {
-      const c = todayFc?.precipitation_probability ?? attr.precipitation_probability;
-      pe.textContent = c !== undefined ? `${Math.round(c)}%` : '--%';
-    }
     const pme = $('precip-mm');
     if (pme) {
       const mm = todayFc?.precipitation ?? attr.precipitation;
-      pme.textContent = mm !== undefined ? ` · ${mm}mm` : '';
+      pme.textContent = mm !== undefined ? `${mm}mm` : '--';
     }
 
-    // Zon — eerstvolgende event
     const sunEnt = this._config.sun;
     if (sunEnt && this._hass) {
       const ss = this._hass.states[sunEnt];
